@@ -139,6 +139,16 @@ def ck():
                     tuiguang_tuangoushuI = json_tuiguang['msg']['total']['T30009']
                     tuiguang_liulanshuJ = json_tuiguang['msg']['total']['T30027']
                     tuiguang_baoguangshuK = json_tuiguang['msg']['total']['T30002']
+                    if int(tuiguang_zongdingdanshuD):
+                        tuiguang_shijichengben = str(round(float(tuiguang_tuiguangfeiB)/float(tuiguang_zongdingdanshuD),2))
+                    else:
+                        tuiguang_shijichengben = 'Nan'
+
+                    if int(tuiguang_dianjishuE):
+                        tuiguang_dianjijunjia = str(round(float(tuiguang_tuiguangfeiB)/float(tuiguang_dianjishuE),2))
+                    else:
+                        tuiguang_dianjijunjia = 'Nan'
+
                     print('日期：' + tuiguang_dateA)
                     print('推广费：' + tuiguang_tuiguangfeiB)
                     print('团购订单数：' + tuiguang_dingdanshuC)
@@ -150,14 +160,20 @@ def ck():
                     print('团购点击数：' + tuiguang_tuangoushuI)
                     print('浏览数：' + tuiguang_liulanshuJ)
                     print('曝光数：' + tuiguang_baoguangshuK)
+                    print('实际获客成本：' + tuiguang_shijichengben)
+                    print('点击均价：' + tuiguang_dianjijunjia)
                     ################################
 
                     # 获取浏览数据
+                    time.sleep(0.5)
                     dict_shopname_shopid = {
                         '曲氏老北京涮肉（夏湾店）': 111948742,
                         '于氏老北京涮肉（前山店）': 132876018,
                         '麗莎花园西餐厅（旧物仓店）': 130826100,
                     }
+                    liulan_guanggao = 'Nan'
+                    liulan_mendian = 'Nan'
+                    liulan_zong = 'Nan'
                     if shopname in dict_shopname_shopid.keys():
                         shopid = dict_shopname_shopid[shopname]
                     else:
@@ -210,6 +226,9 @@ def ck():
                         print('接口报错。。。')
 
                     # 获取排名
+                    liulan_paiming_diyi = 'Nan'
+                    liulan_paiming_mendian = 'Nan'
+                    liulan_paiming_junzhi = 'Nan'
                     url_liulan_paiming = 'https://midas.dianping.com/shopdiy/report/datareport/pc/ajax/getCompeteDataV2'
                     param_liulan_paiming = {
                         'beginDate': str((date.today() + timedelta(days=-1)).strftime("%Y-%m-%d")),
@@ -236,6 +255,7 @@ def ck():
                         print('接口报错。。。')
 
                     # 获取评分
+                    time.sleep(0.5)
                     'https://ecom.meituan.com/emis/gw/rpc/TFeedbackEcomService/getFeedbackSummary?_tm=1647760548474'
                     url_dianpingpingjia_details = 'https://ecom.meituan.com/emis/gw/rpc/TFeedbackEcomService/getFeedbackSummary'
                     param_dianpingpingjia = {'_tm': str(int(round(time.time() * 1000)))}
@@ -670,6 +690,8 @@ def ck():
                 ws.cell(row_save, 9).value = str(tuiguang_tuangoushuI)
                 ws.cell(row_save, 10).value = str(tuiguang_liulanshuJ)
                 ws.cell(row_save, 11).value = str(tuiguang_baoguangshuK)
+                ws.cell(row_save, 12).value = str(tuiguang_shijichengben)
+                ws.cell(row_save, 13).value = str(tuiguang_dianjijunjia)
                 ws.cell(row_save, 14).value = str(liulan_zong)
                 ws.cell(row_save, 15).value = str(liulan_guanggao)
                 ws.cell(row_save, 16).value = str(liulan_mendian)
@@ -749,11 +771,12 @@ def mail():
         print('---------发送邮件成功---------')
     except Exception as e:
         print('---------发送邮件失败---------')
+        print(e)
 
 
 print('Here we go.')
 while True:
-    if time.strftime('%H', time.localtime(time.time())) == '19':  # --------------------------------------------发送邮箱时间
+    if time.strftime('%H', time.localtime(time.time())) == '11':  # --------------------------------------------发送邮箱时间
         ck()
         time.sleep(2)
         mail()
