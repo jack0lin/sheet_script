@@ -24,6 +24,11 @@ def ck():
     # 根据ck表格cookie创建请求头
     wb_ck = openpyxl.load_workbook('ck_new.xlsx')
     ws_ck = wb_ck['Sheet']
+
+    requests.adapters.DEFAULT_RETRIES = 10
+    s = requests.session()
+    s.keep_alive = False
+
     for row_ck in range(1, ws_ck.max_row + 1):
         cookie = ws_ck.cell(row_ck, 2).value
         cookie = re.findall('com.sankuai.meishi.fe.kdb-bsid=(.*?);', cookie)
@@ -37,11 +42,12 @@ def ck():
             sys.exit()
         header_tuiguang = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36',
-            'Cookie': 'adpbsid=' + cookie
+            'Cookie': 'adpbsid=' + cookie,
         }
         header_jingying = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36',
-            'Cookie': 'com.sankuai.meishi.fe.kdb-bsid=' + cookie
+            'Cookie': 'com.sankuai.meishi.fe.kdb-bsid=' + cookie,
+            'Connection': 'close'
         }
 
         # 获取门店各分店名称及poiId
@@ -84,27 +90,35 @@ def ck():
         # print('获取launchId列表：'+str(dict_shopname_launchId))
 
         # 获取所有合同
-        url_contract = 'https://ecom.meituan.com/finance/gw/api/daily/-/finance/common/contractdealpoilist?_tm=' + str(
-            int(round(time.time() * 1000))) + '&subBizType=0'
-        rep_contract = requests.get(url_contract, headers=header_jingying)
-        dict_contract = {}
-        for each_contract in json.loads(rep_contract.text)['data']['accountMenuList']:
-            dict_contract[each_contract['accountName']] = {}
-            dict_contract[each_contract['accountName']]['contractId'] = each_contract['contractId']
-            dict_contract[each_contract['accountName']]['Id'] = each_contract['id']
-        # print('团购合同列表：'+str(dict_contract))
-        dict_contractpoiId = {}
-        for each_contractpoiId in json.loads(rep_contract.text)['data']['poiList']:
-            name_contractpoiId = re.sub('.*_', '', each_contractpoiId['name'])
-            dict_contractpoiId[name_contractpoiId] = each_contractpoiId['id']
-        # print('团购合同poiId列表：'+str(dict_contractpoiId))
+        try:
+            url_contract = 'https://ecom.meituan.com/finance/gw/api/daily/-/finance/common/contractdealpoilist?_tm=' + str(
+                int(round(time.time() * 1000))) + '&subBizType=0'
+            rep_contract = requests.get(url_contract, headers=header_jingying)
+            dict_contract = {}
+            for each_contract in json.loads(rep_contract.text)['data']['accountMenuList']:
+                dict_contract[each_contract['accountName']] = {}
+                dict_contract[each_contract['accountName']]['contractId'] = each_contract['contractId']
+                dict_contract[each_contract['accountName']]['Id'] = each_contract['id']
+            # print('团购合同列表：'+str(dict_contract))
+            dict_contractpoiId = {}
+            for each_contractpoiId in json.loads(rep_contract.text)['data']['poiList']:
+                name_contractpoiId = re.sub('.*_', '', each_contractpoiId['name'])
+                dict_contractpoiId[name_contractpoiId] = each_contractpoiId['id']
+            # print('团购合同poiId列表：'+str(dict_contractpoiId))
+        except Exception as e:
+            print(e)
 
         # 选择分店和合同
-        list_contract = []
-        for each_conntract in dict_contract.keys():
-            list_contract.append(each_conntract)
-        if list_contract == []:
-            list_contract.append('（无）')
+        try:
+            list_contract = []
+            for each_conntract in dict_contract.keys():
+                list_contract.append(each_conntract)
+            if list_contract == []:
+                list_contract.append('（无）')
+
+        except Exception as e:
+            print(e)
+            print('合同报错。')
 
         for shopname in dict_shopname_poiId.keys():
             for contract in list_contract:
@@ -142,12 +156,12 @@ def ck():
                     if int(tuiguang_zongdingdanshuD):
                         tuiguang_shijichengben = str(round(float(tuiguang_tuiguangfeiB)/float(tuiguang_zongdingdanshuD),2))
                     else:
-                        tuiguang_shijichengben = 'Nan'
+                        tuiguang_shijichengben = '0'
 
                     if int(tuiguang_dianjishuE):
                         tuiguang_dianjijunjia = str(round(float(tuiguang_tuiguangfeiB)/float(tuiguang_dianjishuE),2))
                     else:
-                        tuiguang_dianjijunjia = 'Nan'
+                        tuiguang_dianjijunjia = '0'
 
                     print('日期：' + tuiguang_dateA)
                     print('推广费：' + tuiguang_tuiguangfeiB)
@@ -165,15 +179,15 @@ def ck():
                     ################################
 
                     # 获取浏览数据
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                     dict_shopname_shopid = {
                         '曲氏老北京涮肉（夏湾店）': 111948742,
                         '于氏老北京涮肉（前山店）': 132876018,
                         '麗莎花园西餐厅（旧物仓店）': 130826100,
                     }
-                    liulan_guanggao = 'Nan'
-                    liulan_mendian = 'Nan'
-                    liulan_zong = 'Nan'
+                    liulan_guanggao = '0'
+                    liulan_mendian = '0'
+                    liulan_zong = '0'
                     if shopname in dict_shopname_shopid.keys():
                         shopid = dict_shopname_shopid[shopname]
                     else:
@@ -217,6 +231,7 @@ def ck():
                         area = liulan_city + ',' + liulan_district + ',' + liulan_region
                         starLevel = json_liulan['msg']['starLevel'][-1]['id']
                         category = json_liulan['msg']['category'][-1]['id']
+                        category_name = json_liulan['msg']['category'][-1]['name']
 
                     # print('城市：' + liulan_city)
                     # print('地区：' + liulan_district)
@@ -226,9 +241,9 @@ def ck():
                         print('接口报错。。。')
 
                     # 获取排名
-                    liulan_paiming_diyi = 'Nan'
-                    liulan_paiming_mendian = 'Nan'
-                    liulan_paiming_junzhi = 'Nan'
+                    liulan_paiming_diyi = '0'
+                    liulan_paiming_mendian = '0'
+                    liulan_paiming_junzhi = '0'
                     url_liulan_paiming = 'https://midas.dianping.com/shopdiy/report/datareport/pc/ajax/getCompeteDataV2'
                     param_liulan_paiming = {
                         'beginDate': str((date.today() + timedelta(days=-1)).strftime("%Y-%m-%d")),
@@ -255,8 +270,7 @@ def ck():
                         print('接口报错。。。')
 
                     # 获取评分
-                    time.sleep(0.5)
-                    'https://ecom.meituan.com/emis/gw/rpc/TFeedbackEcomService/getFeedbackSummary?_tm=1647760548474'
+                    time.sleep(3)
                     url_dianpingpingjia_details = 'https://ecom.meituan.com/emis/gw/rpc/TFeedbackEcomService/getFeedbackSummary'
                     param_dianpingpingjia = {'_tm': str(int(round(time.time() * 1000)))}
                     data_dianpingpingjia_details = {
@@ -291,7 +305,7 @@ def ck():
                     print('服务评分：' + str(dianpingzongpingjia_fuwu))
 
                     # 获取实收金额
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                     url_shishoujine = 'https://ecom.meituan.com/emis/gw/rpc/TEcomOperationDataService/getEcomConsumeTimeDataRegion'
                     param_shishoujine = {'_tm': str(int(round(time.time() * 1000)))}
                     data_shishoujine = {'optionType': '1', 'poiId': poiId}
@@ -303,7 +317,7 @@ def ck():
                     print('实收金额：' + shishoujineQ)
 
                     # 获取收单金额
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                     shoudanjineR = ''
                     url_shoudanjine = 'https://ecom.meituan.com/emis/gw/rpc/TEcomOperationDataService/getEcomConsumeDistrubution'
                     param_shoudanjine = {'_tm': str(int(round(time.time() * 1000)))}
@@ -323,7 +337,7 @@ def ck():
 
                     # 获取大众点评评价数
                     # 总评
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                     url_dianpingpingjia = 'https://ecom.meituan.com/emis/gw/rpc/TFeedbackEcomService/queryFeedback'
                     param_dianpingpingjia = {'_tm': str(int(round(time.time() * 1000)))}
                     data_dianpingpingjia = {
@@ -350,7 +364,7 @@ def ck():
                     print('点评总评价数：' + str(dianpingzongpingjiaW))
 
                     # 坏评
-                    time.sleep(0.5)
+                    time.sleep(5)
                     data_dianpingbadpingjia = {
                         'platform': '1',
                         'pageInfo': {'total': '0', 'offset': '0', 'limit': '10'},
@@ -375,7 +389,7 @@ def ck():
                     print('点评坏评价数：' + str(dianpingbadpingjiaX))
 
                     # 精选
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                     data_dianpingjingxuan = {
                         'platform': '1',
                         'pageInfo': {'total': '0', 'offset': '0', 'limit': '10'},
@@ -400,7 +414,7 @@ def ck():
                     print('点评精选数：' + str(dianpingjingxuanY))
 
                     # 获取点评星级
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                     url_dianpingxingji = 'https://ecom.meituan.com/emis/gw/rpc/TFeedbackEcomService/getFeedbackSummary'
                     param_dianpingxingji = {'_tm': str(int(round(time.time() * 1000)))}
                     data_dianpingxingji = {
@@ -426,7 +440,7 @@ def ck():
 
                     # 获取美团评价数
                     # 总评
-                    time.sleep(0.5)
+                    time.sleep(3)
                     url_meituanpingjia = 'https://ecom.meituan.com/emis/gw/rpc/TFeedbackEcomService/queryFeedback'
                     param_meituanpingjia = {'_tm': str(int(round(time.time() * 1000)))}
                     data_meituanpingjia = {
@@ -453,7 +467,7 @@ def ck():
                     print('美团总评价数：' + str(meituanzongpingjiaAA))
 
                     # 坏评
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                     data_meituanbadpingjia = {
                         'platform': '0',
                         'pageInfo': {'total': '0', 'offset': '0', 'limit': '10'},
@@ -478,7 +492,7 @@ def ck():
                     print('美团坏评价数：' + str(meituanbadpingjiaAB))
 
                     # 获取美团星级
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                     url_meituanxingji = 'https://ecom.meituan.com/emis/gw/rpc/TFeedbackEcomService/getFeedbackSummary'
                     param_meituanxingji = {'_tm': str(int(round(time.time() * 1000)))}
                     data_meituanxingji = {
@@ -534,12 +548,60 @@ def ck():
                         paimingAE = '100名以外'
                     print('排名：' + str(paimingAE))
 
+
+                    # 获取套餐及代金券
+                    # url_taocan = 'https://ecom.meituan.com/emis/gw/rpc/TEcomBusinessAnalysisService/getTPageGroupCompareData'
+                    # param_taoacan = {'_tm': str(int(round(time.time() * 1000)))}
+                    # data_taocan = {
+                    #     'pageDomain': {'currPage': '0', 'pageSize': '30', 'totalNum': '0'},
+                    #     'sortKey': 'groupVisitUv',
+                    #     'sortOrder': 'desc',
+                    #     'tOptionType': '1'
+                    # }
+                    # rep_taocan = requests.post(url_taocan, headers=header_jingying, params=param_taoacan,
+                    #                            json=data_taocan)
+                    # # print(rep_taocan.text)
+                    # dict_changenametuangou_taocan = []
+                    # dict_changenametuangou_daijinquan = []
+                    #
+                    # for each_taocan in json.loads(rep_taocan.text)['data']['tGroupCompareDatas']:
+                    #     # print(each_taocan)
+                    #     # print(re.findall('[[](.*?)[]]', each_taocan['groupName']))
+                    #     if "代金券" in each_taocan['groupName']:
+                    #         daijinquan = {
+                    #             "name": each_taocan['groupName'],
+                    #             "cnt": str(each_taocan['consuCpnCnt']),
+                    #             "price": float(re.findall('[[](.*?)[]]', each_taocan['groupName'])[0])
+                    #         }
+                    #         dict_changenametuangou_daijinquan.append(daijinquan)
+                    #     else:
+                    #         taocan = {
+                    #             "name": each_taocan['groupName'],
+                    #             "cnt": str(each_taocan['consuCpnCnt']),
+                    #             "price": float(re.findall('[[](.*?)[]]', each_taocan['groupName'])[0])
+                    #         }
+                    #         dict_changenametuangou_taocan.append(taocan)
+                    #
+                    #     # print('套餐名称：' + each_taocan['groupName'])
+                    #     # print('套餐售卖：' + str(each_taocan['consuCpnCnt']))
+                    #     # print('套餐售卖金额：' + str(each_taocan['consuAmt']))
+                    #
+                    # if dict_changenametuangou_taocan:
+                    #     dict_changenametuangou_taocan.sort(key=lambda item: item.get('price'), reverse=False)
+                    #     print(
+                    #         '套餐：' + str(dict_changenametuangou_taocan))
+                    #
+                    # if dict_changenametuangou_daijinquan:
+                    #     dict_changenametuangou_daijinquan.sort(key=lambda item: item.get('price'),
+                    #                                            reverse=True)
+                    #     print('代金券：' + str(dict_changenametuangou_daijinquan))
+
                     # 获取套餐价格
                     for each_contractpoiId in dict_contractpoiId.keys():
                         if shopname in each_contractpoiId:
                             poiId_shopname = each_contractpoiId
                             break
-                    time.sleep(0.5)
+                    time.sleep(1.5)
                     if contract != '（无）':
                         # 获取套餐价格
                         url_summarydeallist = 'https://ecom.meituan.com/finance/gw/api/daily/-/finance/profit/summarydeallist'
@@ -564,18 +626,58 @@ def ck():
                         rep_summarydeallist = requests.get(url_summarydeallist, headers=header_jingying,
                                                            params=param_summarydeallist)
                         # print(rep_summarydeallist.text)
+
                         dict_tuangou = {}
+                        dict_daijinquan = {}
+                        list_tuangou = []
+                        list_daijinquan = []
+                        list_all = []
+
                         for each_tuangou in json.loads(rep_summarydeallist.text)['data']['list']['items']:
                             if ('已下线' in each_tuangou['name']) == False:
                                 each_tuangouming = each_tuangou['name']
                                 each_tuangoushu = each_tuangou['details'][0]['cnt']
                                 each_tuangoue = each_tuangou['details'][0]['realPayed']
                                 each_nameid = each_tuangou['id']
-                                dict_tuangou[each_tuangouming] = {}
-                                dict_tuangou[each_tuangouming]['cnt'] = each_tuangoushu
-                                dict_tuangou[each_tuangouming]['realPayed'] = each_tuangoue
-                                dict_tuangou[each_tuangouming]['nameid'] = each_tuangou['id']  # 获取财务管理nameid
+                                if "代金券" in each_tuangou['name']:
+                                    dict_daijinquan[each_tuangouming] = {}
+                                    dict_daijinquan[each_tuangouming]['name'] = each_tuangouming
+                                    dict_daijinquan[each_tuangouming]['cnt'] = each_tuangoushu
+                                    dict_daijinquan[each_tuangouming]['price'] = float(re.findall('[[](.*?)元[]]', each_tuangouming)[0])
+                                    dict_daijinquan[each_tuangouming]['realPayed'] = each_tuangoue
+                                    dict_daijinquan[each_tuangouming]['nameid'] = each_tuangou['id']
+                                else:
+                                    dict_tuangou[each_tuangouming] = {}
+                                    dict_tuangou[each_tuangouming]['name'] = each_tuangouming
+                                    dict_tuangou[each_tuangouming]['cnt'] = each_tuangoushu
+                                    dict_tuangou[each_tuangouming]['price'] = float(
+                                        re.findall('[[](.*?)元[]]', each_tuangouming)[0])
+                                    dict_tuangou[each_tuangouming]['realPayed'] = each_tuangoue
+                                    dict_tuangou[each_tuangouming]['nameid'] = each_tuangou['id']  # 获取财务管理nameid
+
                         # print(dict_tuangou)
+                        if dict_tuangou:
+                            for tuangou in dict_tuangou.keys():
+                                list_tuangou.append(dict_tuangou[tuangou])
+                            # print(list_tuangou)
+                            list_tuangou.sort(key=lambda item: item.get('price'), reverse=False)
+
+                        if dict_daijinquan:
+                            for daijinquan in dict_daijinquan.keys():
+                                list_daijinquan.append(dict_daijinquan[daijinquan])
+                            list_daijinquan.sort(key=lambda item: item.get('price'), reverse=False)
+
+                        for toangou in list_tuangou:
+                            list_all.append(toangou['name'])
+                            list_all.append(toangou['cnt'])
+
+                        for daijinquan in list_daijinquan:
+                            list_all.append(daijinquan['name'])
+                            list_all.append(daijinquan['cnt'])
+
+                        # print(list_tuangou)
+                        # print(list_daijinquan)
+                        # print(list_all)
 
                         # 获取按团购分析的nameid
                         dict_tuangounameid = {}
@@ -617,7 +719,49 @@ def ck():
                     # print(dict_changenametuangou)
 
                     else:
+                        # 'https://ecom.meituan.com/emis/gw/rpc/TEcomBusinessAnalysisService/getAllObjects?_tm=1648460600767'
+                        # 'https://ecom.meituan.com/emis/gw/rpc/TEcomBusinessAnalysisService/getGroupAnalysisCoreDatas?_tm=1648460600838&bObjectId=51989472&endTime=null&platform=0&startTime=null&tOptionType=1'
+                        # 'https://ecom.meituan.com/finance/gw/api/daily/-/finance/profit/detailconsumelist?_tm=1648549611853&beginTime=1648396800&dealPartner=0&endTime=1648483199&hideZero=1&limit=50&offset=0&partner=0&poiId=1134343104'
+
                         # 获取套餐及代金券
+                        # url_taocan = 'https://ecom.meituan.com/emis/gw/rpc/TEcomBusinessAnalysisService/getTPageGroupCompareData'
+                        # param_taoacan = {'_tm': str(int(round(time.time() * 1000)))}
+                        # data_taocan = {
+                        #     'pageDomain': {'currPage': '0', 'pageSize': '30', 'totalNum': '0'},
+                        #     'sortKey': 'groupVisitUv',
+                        #     'sortOrder': 'desc',
+                        #     'tOptionType': '1'
+                        # }
+                        # rep_taocan = requests.post(url_taocan, headers=header_jingying, params=param_taoacan,
+                        #                            json=data_taocan)
+                        # # print(rep_taocan.text)
+                        # dict_changenametuangou_taocan = []
+                        # dict_changenametuangou_daijinquan = []
+                        #
+                        # for each_taocan in json.loads(rep_taocan.text)['data']['tGroupCompareDatas']:
+                        #     if "代金券" in each_taocan['groupName']:
+                        #         daijinquan = {
+                        #             "name" : each_taocan['groupName'],
+                        #             "cnt" : str(each_taocan['consuCpnCnt'])
+                        #         }
+                        #         dict_changenametuangou_daijinquan.append(daijinquan)
+                        #     else:
+                        #         taocan = {
+                        #             "name": each_taocan['groupName'],
+                        #             "cnt": str(each_taocan['consuCpnCnt'])
+                        #         }
+                        #         dict_changenametuangou_taocan.append(taocan)
+                        #
+                        #     print('套餐名称：' + each_taocan['groupName'])
+                        #     print('套餐售卖：' + str(each_taocan['consuCpnCnt']))
+                        #     print('套餐售卖金额：' + str(each_taocan['consuAmt']))
+                        #
+                        # if dict_changenametuangou_taocan:
+                        #     print('套餐：' + dict_changenametuangou_taocan.sort(key=lambda item: item.get('cnt'), reverse=False))
+                        #
+                        # if dict_changenametuangou_daijinquan:
+                        #     print('代金券：' + dict_changenametuangou_daijinquan.sort(key=lambda item: item.get('cnt'), reverse=False))
+
                         url_taocan = 'https://ecom.meituan.com/emis/gw/rpc/TEcomBusinessAnalysisService/getTPageGroupCompareData'
                         param_taoacan = {'_tm': str(int(round(time.time() * 1000)))}
                         data_taocan = {
@@ -630,6 +774,7 @@ def ck():
                                                    json=data_taocan)
                         # print(rep_taocan.text)
                         dict_changenametuangou = {}
+
                         for each_taocan in json.loads(rep_taocan.text)['data']['tGroupCompareDatas']:
                             print('套餐名称：' + each_taocan['groupName'])
                             print('套餐售卖：' + str(each_taocan['consuCpnCnt']))
@@ -637,7 +782,7 @@ def ck():
                             dict_changenametuangou[each_taocan['groupName']] = {}
                             dict_changenametuangou[each_taocan['groupName']]['cnt'] = str(each_taocan['consuCpnCnt'])
                             dict_changenametuangou[each_taocan['groupName']]['realPayed'] = str(each_taocan['consuAmt'])
-                    # print(dict_changenametuangou)
+                        print(dict_changenametuangou)
                 except Exception as e:
                     print('---------后台无相应数据，跳过---------')
                     print(e)
@@ -655,7 +800,7 @@ def ck():
                                    '自然浏览量', '总实收金额', '套餐实收金额', '代金券实收金额', '美团收单金额', '同行第一', '我的门店', '同行均值', '新增评价数（点评）',
                                    '新增差评数（点评）', '新增精选评价数（点评）', '星级评分（点评）', '口味评分', '环境评分', '服务评分', '新增评价数量（美团）',
                                    '新增差评数（美团）', '星级评分（美团）', '线上活动', '推广通调整动作', '人气榜（美团）', '点评品类热门榜',
-                                   '点评全美食热门榜（全城不分品种总排位）'])
+                                   '点评全美食热门榜（全城不分品种总排位）', '类目'])
                         try:
                             wb.save(ws_ck.cell(row_ck, 1).value + '.xlsx')
                         except:
@@ -670,7 +815,7 @@ def ck():
                          '团购点击数量（次）', '浏览数量（次）', '曝光数量（次）', '实际获客成本（元）', '点击均价', '总浏览量', '广告浏览量', '自然浏览量', '总实收金额',
                          '套餐实收金额', '代金券实收金额', '美团收单金额', '同行第一', '我的门店', '同行均值', '新增评价数（点评）', '新增差评数（点评）', '新增精选评价数（点评）',
                          '星级评分（点评）', '口味评分', '环境评分', '服务评分', '新增评价数量（美团）', '新增差评数（美团）', '星级评分（美团）', '线上活动', '推广通调整动作',
-                         '人气榜（美团）', '点评品类热门榜', '点评全美食热门榜（全城不分品种总排位）'])
+                         '人气榜（美团）', '点评品类热门榜', '点评全美食热门榜（全城不分品种总排位）', '类目'])
 
                     try:
                         wb.save(ws_ck.cell(row_ck, 1).value + '.xlsx')
@@ -713,24 +858,31 @@ def ck():
                 ws.cell(row_save, 32).value = str(meituanbadpingjiaAB)
                 ws.cell(row_save, 33).value = str(meituanxingjiAC)
                 ws.cell(row_save, 38).value = str(paimingAE)
-                columnFORtuangou = 0
-                list_columnFORtuangou = []
-                while True:
-                    if ws.cell(1, 39 + columnFORtuangou).value != None:
-                        list_columnFORtuangou.append(columnFORtuangou)
-                        columnFORtuangou = columnFORtuangou + 3
-                    elif ws.cell(1, 39 + columnFORtuangou).value == None:
-                        break
+                ws.cell(row_save, 39).value = str(category_name)
 
-                for columnFORtuangou in list_columnFORtuangou:
-                    for each_tuangouSAVE in dict_changenametuangou.keys():
-                        if ws.cell(1, 39 + columnFORtuangou).value == each_tuangouSAVE:
-                            ws.cell(row_save, 39 + columnFORtuangou).value = str(each_tuangouSAVE)
-                            ws.cell(row_save, 40 + columnFORtuangou).value = str(
-                                dict_changenametuangou[each_tuangouSAVE]['cnt'])
-                            ws.cell(row_save, 41 + columnFORtuangou).value = str(
-                                dict_changenametuangou[each_tuangouSAVE]['realPayed'])
-                            columnFORtuangou = columnFORtuangou + 3
+                columns = 40
+                for column in list_all:
+                    ws.cell(row_save, columns).value = str(column)
+                    columns += 1
+
+                # columnFORtuangou = 0
+                # list_columnFORtuangou = []
+                # while True:
+                #     if ws.cell(1, 40 + columnFORtuangou).value != None:
+                #         list_columnFORtuangou.append(columnFORtuangou)
+                #         columnFORtuangou = columnFORtuangou + 3
+                #     elif ws.cell(1, 40 + columnFORtuangou).value == None:
+                #         break
+                #
+                # for columnFORtuangou in list_columnFORtuangou:
+                #     for each_tuangouSAVE in dict_changenametuangou.keys():
+                #         if ws.cell(1, 40 + columnFORtuangou).value == each_tuangouSAVE:
+                #             ws.cell(row_save, 40 + columnFORtuangou).value = str(each_tuangouSAVE)
+                #             ws.cell(row_save, 41 + columnFORtuangou).value = str(
+                #                 dict_changenametuangou[each_tuangouSAVE]['cnt'])
+                #             ws.cell(row_save, 42 + columnFORtuangou).value = str(
+                #                 dict_changenametuangou[each_tuangouSAVE]['realPayed'])
+                #             columnFORtuangou = columnFORtuangou + 3
                 try:
                     wb.save(ws_ck.cell(row_ck, 1).value + '.xlsx')
                     print('保存成功')
@@ -773,10 +925,9 @@ def mail():
         print('---------发送邮件失败---------')
         print(e)
 
-
-print('Here we go.')
+print("Here we go.")
 while True:
-    if time.strftime('%H', time.localtime(time.time())) == '11':  # --------------------------------------------发送邮箱时间
+    if time.strftime('%H', time.localtime(time.time())) == '12':  # --------------------------------------------发送邮箱时间
         ck()
         time.sleep(2)
         mail()
